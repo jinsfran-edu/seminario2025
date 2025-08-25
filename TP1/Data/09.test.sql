@@ -1,5 +1,11 @@
 USE Empleados;
-SET @tiempoini=NOW(6);
+SET NOCOUNT ON;
+DECLARE @crc as varchar(max);
+DECLARE @crc_fail as bigint;
+DECLARE @count_fail as bigint;
+DECLARE @tiempoini as datetime;
+SET @tiempoini=GETDATE();
+
 DROP TABLE IF EXISTS valores_esperados, valores_encontrados;
 CREATE TABLE valores_esperados (
     tabla   VARCHAR(30)  NOT NULL PRIMARY KEY,
@@ -7,7 +13,11 @@ CREATE TABLE valores_esperados (
     crc_md5 VARCHAR(100) NOT NULL
 );
 
-CREATE TABLE valores_encontrados LIKE valores_esperados;
+CREATE TABLE valores_encontrados (
+    tabla   VARCHAR(30)  NOT NULL PRIMARY KEY,
+    regs    INT          NOT NULL,
+    crc_md5 VARCHAR(100) NOT NULL
+);
 
 INSERT INTO valores_esperados VALUES 
 ('empleados',   300024,'4ec56ab5ba37218d187cf6ab09ce1aa1'),
@@ -16,54 +26,47 @@ INSERT INTO valores_esperados VALUES
 ('dept_emp',    331603,'ccf6fe516f990bdaa49713fc478701b7'),
 ('puestos',      443308,'bfa016c472df68e70a03facafa1bc0a8'),
 ('sueldos',   2844047,'fd220654e95aea1b169624ffe3fca934');
+
 SELECT tabla, regs AS registros_esperados, crc_md5 AS crc_esperado FROM valores_esperados;
 
 SET @crc= '';
-DROP TABLE IF EXISTS tchecksum;
-CREATE TABLE tchecksum (chk char(100));
-INSERT INTO tchecksum 
-    SELECT @crc := MD5(CONCAT_WS('#',@crc,id_emp,fecha_nacimiento,nombre,apellido,genero,fecha_alta)) 
+    SELECT @crc = dbo.MD5(CONCAT_WS('#',@crc,id_emp,fecha_nacimiento,nombre,apellido,genero,fecha_alta)) 
     FROM empleados ORDER BY id_emp;
 INSERT INTO valores_encontrados VALUES ('empleados', (SELECT COUNT(*) FROM empleados),@crc);
 
 SET @crc = '';
-INSERT INTO tchecksum 
-    SELECT @crc := MD5(CONCAT_WS('#',@crc, id_dept,nombre_dept)) 
+    SELECT @crc = dbo.MD5(CONCAT_WS('#',@crc, id_dept,nombre_dept)) 
     FROM departamentos ORDER BY id_dept;
 INSERT INTO valores_encontrados VALUES ('departamentos', (SELECT COUNT(*) FROM departamentos), @crc);
 
 SET @crc = '';
-INSERT INTO tchecksum 
-    SELECT @crc := MD5(CONCAT_WS('#',@crc, id_dept,id_emp, fecha_desde,fecha_hasta)) 
+    SELECT @crc = dbo.MD5(CONCAT_WS('#',@crc, id_dept,id_emp, fecha_desde,fecha_hasta)) 
     FROM dept_respo ORDER BY id_dept,id_emp;
 INSERT INTO valores_encontrados VALUES ('dept_respo', (SELECT COUNT(*) FROM dept_respo), @crc);
 
 SET @crc = '';
-INSERT INTO tchecksum 
-    SELECT @crc := MD5(CONCAT_WS('#',@crc, id_dept,id_emp, fecha_desde,fecha_hasta)) 
+    SELECT @crc = dbo.MD5(CONCAT_WS('#',@crc, id_dept,id_emp, fecha_desde,fecha_hasta)) 
     FROM dept_emp ORDER BY id_dept,id_emp;
 INSERT INTO valores_encontrados VALUES ('dept_emp', (SELECT COUNT(*) FROM dept_emp), @crc);
 
 SET @crc = '';
-INSERT INTO tchecksum 
-    SELECT @crc := MD5(CONCAT_WS('#',@crc, id_emp, puesto, fecha_desde,fecha_hasta)) 
+    SELECT @crc = dbo.MD5(CONCAT_WS('#',@crc, id_emp, puesto, fecha_desde,fecha_hasta)) 
     FROM puestos ORDER BY id_emp,puesto,fecha_desde;
 INSERT INTO valores_encontrados VALUES ('puestos', (SELECT COUNT(*) FROM puestos), @crc);
 
 SET @crc = '';
-INSERT INTO tchecksum 
-    SELECT @crc := MD5(CONCAT_WS('#',@crc, id_emp, sueldo, fecha_desde,fecha_hasta)) 
+    SELECT @crc = dbo.MD5(CONCAT_WS('#',@crc, id_emp, sueldo, fecha_desde,fecha_hasta)) 
     FROM sueldos ORDER BY id_emp,fecha_desde,fecha_hasta;
 INSERT INTO valores_encontrados VALUES ('sueldos', (SELECT COUNT(*) FROM sueldos), @crc);
 
-DROP TABLE IF EXISTS tchecksum;
+
 
 SELECT tabla, regs AS 'registros_encontrados', crc_md5 AS crc_encontrado FROM valores_encontrados;
 
 SELECT  
     e.tabla, 
-    IF(e.regs=f.regs,'OK', 'No OK') AS coinciden_registros, 
-    IF(e.crc_md5=f.crc_md5,'OK','No OK') AS coindicen_crc 
+    IIF(e.regs=f.regs,'OK', 'No OK') AS coinciden_registros, 
+    IIF(e.crc_md5=f.crc_md5,'OK','No OK') AS coindicen_crc 
 FROM 
     valores_esperados e INNER JOIN valores_encontrados f ON e.tabla=f.tabla;
 
@@ -72,10 +75,12 @@ SET @count_fail=(SELECT COUNT(*) FROM valores_esperados e INNER JOIN valores_enc
 
 DROP TABLE valores_esperados,valores_encontrados;
 
-SELECT 'UUID' AS Resumen, @@server_uuid AS Resultado
+SELECT 'UUID' AS Resumen, CAST([service_broker_guid] AS varchar(50)) AS 'Resultado'
+FROM   sys.databases
+WHERE [name] = N'msdb'
 UNION ALL
-SELECT 'CRC', IF(@crc_fail = 0, 'OK', 'Error' )
+SELECT 'CRC', IIF(@crc_fail = 0, 'OK', 'Error' )
 UNION ALL
-SELECT 'Cantidad', IF(@count_fail = 0, 'OK', 'Error' )
+SELECT 'Cantidad', IIF(@count_fail = 0, 'OK', 'Error' )
 UNION ALL
-SELECT 'Tiempo', TIMESTAMPDIFF(MICROSECOND,@tiempoini,NOW(6))/1000;
+SELECT 'Tiempo', CAST(DATEDIFF(MILLISECOND,@tiempoini,GETDATE()) AS varchar(50));

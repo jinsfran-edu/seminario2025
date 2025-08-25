@@ -1,16 +1,20 @@
 CREATE DATABASE Empleados;
 
+GO
+
 USE Empleados;
 
+GO
 
 CREATE TABLE empleados (
     id_emp            INT             NOT NULL,
     fecha_nacimiento  DATE            NOT NULL,
     nombre            VARCHAR(14)     NOT NULL,
     apellido          VARCHAR(16)     NOT NULL,
-    genero            ENUM ('M','F')  NOT NULL,
+    genero            CHAR(1)         NOT NULL,
     fecha_alta        DATE            NOT NULL,
-    CONSTRAINT PK_empleados PRIMARY KEY (id_emp)
+    CONSTRAINT PK_empleados PRIMARY KEY (id_emp),
+    CONSTRAINT CHK_genero CHECK (genero IN ('M', 'F'))
 );
 
 
@@ -32,7 +36,6 @@ CREATE TABLE dept_respo (
 );
 
 
- 
 CREATE TABLE dept_emp (
     id_emp            INT             NOT NULL,
     id_dept           CHAR(4)         NOT NULL,
@@ -62,3 +65,16 @@ CREATE TABLE sueldos (
     CONSTRAINT FK_sueldos_empleados FOREIGN KEY (id_emp) REFERENCES empleados (id_emp),
     CONSTRAINT PK_sueldos PRIMARY KEY (id_emp, fecha_desde)
 );
+GO
+CREATE OR ALTER FUNCTION [dbo].[MD5] 
+(
+@pcadena varchar(max)
+)
+RETURNS varchar(32)
+AS
+BEGIN
+    DECLARE @Result varchar(32)
+    SELECT @Result = LOWER(CONVERT(VARCHAR(32), HASHBYTES('MD5', @pcadena), 2))
+    RETURN @Result
+END
+GO

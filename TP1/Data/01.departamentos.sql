@@ -9,3 +9,4 @@ INSERT INTO departamentos VALUES
 ('d007','Ventas'),
 ('d008','Investigacion'),
 ('d009','Atencion a Clientes');
+GO
